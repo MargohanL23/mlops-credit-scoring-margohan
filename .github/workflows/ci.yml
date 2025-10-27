@@ -21,10 +21,14 @@ jobs:
           docker build -t credit-scoring-model .
 
           # Jalankan container dengan environment secrets untuk DagsHub/MLflow
+          # PERBAIKAN KRITIS: Menambahkan MLFLOW_TRACKING_USERNAME dan MLFLOW_TRACKING_PASSWORD
+          # untuk memastikan MLflow client dapat mengautentikasi ke DagsHub Rest Store.
           docker run \
             --env DAGSHUB_USERNAME=${{ secrets.DAGSHUB_USERNAME }} \
             --env DAGSHUB_TOKEN=${{ secrets.DAGSHUB_TOKEN }} \
             --env MLFLOW_TRACKING_URI=https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/mlops-credit-scoring-margohan.mlflow \
+            --env MLFLOW_TRACKING_USERNAME=${{ secrets.DAGSHUB_USERNAME }} \
+            --env MLFLOW_TRACKING_PASSWORD=${{ secrets.DAGSHUB_TOKEN }} \
             credit-scoring-model
         env:
           DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
