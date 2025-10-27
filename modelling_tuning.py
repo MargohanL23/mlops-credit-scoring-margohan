@@ -6,14 +6,14 @@ import dagshub
 import mlflow
 import mlflow.sklearn
 import matplotlib.pyplot as plt
-import seaborn as sns # DITAMBAHKAN
+import seaborn as sns 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
-from sklearn.preprocessing import LabelEncoder # DITAMBAHKAN
+from sklearn.preprocessing import LabelEncoder 
 
 # --- KONFIGURASI DAGSHUB/MLFLOW ---
-# Ganti dengan informasi repositori Anda
+
 REPO_OWNER = "MargohanL23" 
 REPO_NAME = "mlops-credit-scoring-margohan" 
 
@@ -55,12 +55,6 @@ def train_and_log_model():
         le = LabelEncoder()
         y_train = le.fit_transform(y_train)
         y_test = le.transform(y_test)
-        
-        # NOTE: Jika Anda ingin 'bad' selalu menjadi 1 (pos_label),
-        # gunakan y_train.replace({'bad': 1, 'good': 0}, inplace=True) 
-        # asumsikan LabelEncoder menempatkan 'good' ke 0 dan 'bad' ke 1 atau sebaliknya.
-        # Jika f1-score error lagi, Anda mungkin perlu menambahkan pos_label=... di scoring metrik.
-        # Untuk saat ini, LabelEncoder seharusnya sudah memadai.
         
         print("Data bersih berhasil dimuat dan label di-encode.")
     except Exception as e:
@@ -105,34 +99,33 @@ def train_and_log_model():
         y_pred = best_model.predict(X_test)
         y_proba = best_model.predict_proba(X_test)[:, 1] # Probabilitas untuk ROC AUC
 
-        # --- 4. LOG PARAMETER (Wajib Kriteria 2) ---
+        # --- 4. LOG PARAMETER ---
         mlflow.log_params(random_search.best_params_)
         mlflow.log_param("tuning_method", "RandomizedSearchCV")
         mlflow.log_param("data_split", "80/20")
         
-        # --- 5. HITUNG DAN LOG METRIK (Wajib Kriteria 2) ---
+        # --- 5. HITUNG DAN LOG METRIK ---
         metrics = {
             "accuracy": accuracy_score(y_test, y_pred),
             "precision": precision_score(y_test, y_pred, zero_division=0),
             "recall": recall_score(y_test, y_pred, zero_division=0),
             "f1_score": f1_score(y_test, y_pred, zero_division=0),
-            # Metrik Tambahan 1: ROC AUC Score (Wajib Advance)
+            # Metrik Tambahan 1: ROC AUC Score 
             "roc_auc": roc_auc_score(y_test, y_proba)
         }
         mlflow.log_metrics(metrics)
         print("\nMetrik Dasar Berhasil Dilog:")
         print(metrics)
 
-        # --- 6. LOG ARTEFAK TAMBAHAN (Wajib Advance - Minimal 2) ---
-        
-        # Artefak 1: Confusion Matrix Plot (Wajib Advance)
+        # --- 6. LOG ARTEFAK TAMBAHAN ---
+        # Artefak 1: Confusion Matrix Plot 
         cm = confusion_matrix(y_test, y_pred)
         cm_path = plot_confusion_matrix(cm, run_id)
         mlflow.log_artifact(cm_path, "evaluation_plots")
         os.remove(cm_path) # Hapus file lokal setelah diunggah
         print(f"Artefak 1 (Confusion Matrix Plot) berhasil dilog.")
 
-        # Artefak 2: Feature Importance (Wajib Advance)
+        # Artefak 2: Feature Importance 
         feature_importance = pd.Series(best_model.feature_importances_)
         feature_importance_path = f"feature_importance_{run_id}.csv"
         feature_importance.to_csv(feature_importance_path)
@@ -140,7 +133,7 @@ def train_and_log_model():
         os.remove(feature_importance_path)
         print(f"Artefak 2 (Feature Importance) berhasil dilog.")
 
-        # --- 7. LOG MODEL (Wajib Kriteria 2) ---        
+        # --- 7. LOG MODEL ---        
         # 1. Simpan model terbaik secara lokal menggunakan joblib
         model_path = "best_random_forest_model.pkl"
         joblib.dump(best_model, model_path)
