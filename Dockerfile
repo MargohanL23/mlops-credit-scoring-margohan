@@ -1,4 +1,4 @@
-# Gunakan base image Python 3.12 slim
+# Gunakan Python 3.12 (disarankan)
 FROM python:3.12-slim
 
 # Tetapkan direktori kerja di dalam container
@@ -7,19 +7,15 @@ WORKDIR /app
 # Salin file requirements.txt ke dalam container
 COPY requirements.txt .
 
-# Instal semua dependencies. Gunakan --no-cache-dir untuk instalasi yang lebih bersih.
+# Instal semua dependencies, termasuk Flask dan Gunicorn yang baru ditambahkan
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Salin seluruh folder dan script proyek ke dalam container
-# Kita asumsikan struktur folder seperti ini:
-# /membangun_model
-#   |-- modelling_tuning.py
-#   |-- namadataset_preprocessing/ (Berisi clean_data.pkl)
-#   |-- requirements.txt
-#   |-- Dockerfile
+# Salin seluruh file kode (termasuk api.py) dan data ke dalam container
 COPY . .
 
-# Perintah utama saat container dijalankan: jalankan script pelatihan
-# Perlu diperhatikan: Saat CI/CD, kita perlu memastikan 
-# DAGSHUB_TOKEN, MLFLOW_TRACKING_URI, dll sudah disetel.
-CMD ["python", "modelling_tuning.py"]
+# Expose port yang digunakan Gunicorn
+EXPOSE 5000
+
+# Perintah utama: Jalankan server Gunicorn untuk Flask API
+# Ini akan menjalankan server pada port 5000, yang siap menerima request prediksi.
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "api:app"]
