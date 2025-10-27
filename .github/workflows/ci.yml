@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      # Pemicu workflow jika file-file berikut berubah
       - 'modelling_tuning.py'
       - 'Dockerfile'
       - 'requirements.txt'
@@ -18,6 +19,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Langkah debug yang berguna
       - name: Debug - List files in repo
         run: ls -R .
 
@@ -29,10 +31,12 @@ jobs:
 
       - name: Run Model Training in Docker
         run: |
+          # --- KONFIGURASI KRITIS MLFLOW/DAGSHUB ---
+          # Koreksi URI: menggunakan .mlflow di akhir, BUKAN /mlflow
           docker run \
             --env DAGSHUB_USERNAME=${{ secrets.DAGSHUB_USERNAME }} \
             --env DAGSHUB_TOKEN=${{ secrets.DAGSHUB_TOKEN }} \
-            --env MLFLOW_TRACKING_URI="https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/mlops-credit-scoring-margohan/mlflow" \
+            --env MLFLOW_TRACKING_URI="https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/mlops-credit-scoring-margohan.mlflow" \
             --env MLFLOW_TRACKING_USERNAME=${{ secrets.DAGSHUB_USERNAME }} \
             --env MLFLOW_TRACKING_PASSWORD=${{ secrets.DAGSHUB_TOKEN }} \
             --env REPO_OWNER=${{ secrets.DAGSHUB_USERNAME }} \
