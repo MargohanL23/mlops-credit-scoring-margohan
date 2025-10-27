@@ -22,7 +22,7 @@ if TRACKING_URI:
 mlflow.set_experiment("Credit Scoring Tuning - MARGOHAN")
 
 # Path ke artefak Kriteria 1
-PREPROCESSED_DATA_PATH = '//namadataset_preprocessing/clean_data.pkl'
+PREPROCESSED_DATA_PATH = '/namadataset_preprocessing/clean_data.pkl'
 
 def plot_confusion_matrix(cm, run_id):
     """Membuat plot Confusion Matrix dan menyimpannya sebagai artefak."""
