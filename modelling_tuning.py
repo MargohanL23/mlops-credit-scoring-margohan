@@ -11,36 +11,41 @@ from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from sklearn.preprocessing import LabelEncoder
 
-# ===== KONFIGURASI MLFLOW (Mengandalkan ENV Vars dari CI/CD) ===== #
-TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI")
+# ==============================================================
+# ✅ FIXED: Konfigurasi MLflow Tracking ke DagsHub ✅
+# ==============================================================
 
-if TRACKING_URI:
-    try:
-        # Menyetel URI dari environment variable yang disuntikkan Docker/CI
-        mlflow.set_tracking_uri(TRACKING_URI)
-        print(f"✅ MLflow Tracking URI set to: {TRACKING_URI}")
-    except Exception as e:
-        # Jika gagal (misal: format URI salah), log error
-        print(f"⚠️ Gagal set tracking URI: {e}")
-        print("➡️ MLflow akan berjalan dalam offline mode (local).")
-else:
-    # Jika environment variable tidak ditemukan
-    print("⚠️ MLFLOW_TRACKING_URI tidak ditemukan. MLflow offline mode.")
+MLFLOW_TRACKING_URI = "https://dagshub.com/MargohanL23/mlops-credit-scoring-margohan.mlflow"
+os.environ["MLFLOW_TRACKING_URI"] = MLFLOW_TRACKING_URI
+os.environ["MLFLOW_TRACKING_USERNAME"] = "MargohanL23"
+os.environ["MLFLOW_TRACKING_PASSWORD"] = os.getenv("MLFLOW_TRACKING_PASSWORD")  # di-set dari GitHub Actions Secrets
 
-mlflow.set_experiment("Credit Scoring Tuning - MARGOHAN")
+try:
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    print(f"✅ MLflow Tracking URI set to: {MLFLOW_TRACKING_URI}")
+except Exception as e:
+    print(f"⚠ ERROR set URI: {e}")
+    print("➡ MLflow offline mode")
 
-# Path dataset fix 
+
+# ✅ FIXED: Auto create experiment jika belum ada
+EXPERIMENT_NAME = "Credit Scoring Tuning - MARGOHAN"
+try:
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    print(f"✅ Experiment aktif: {EXPERIMENT_NAME}")
+except:
+    print("⚠ Experiment tidak ditemukan — membuat baru...")
+    exp_id = mlflow.create_experiment(EXPERIMENT_NAME)
+    mlflow.set_experiment(EXPERIMENT_NAME)
+
+
+# Dataset path
 PREPROCESSED_DATA_PATH = 'namadataset_preprocessing/clean_data.pkl'
 
 
 def plot_confusion_matrix(cm, run_id):
-    """Membuat dan menyimpan Confusion Matrix sebagai artefak."""
     plt.figure(figsize=(6, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    plt.title('Confusion Matrix')
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-
     save_path = f"confusion_matrix_{run_id}.png"
     plt.savefig(save_path)
     plt.close()
@@ -48,11 +53,9 @@ def plot_confusion_matrix(cm, run_id):
 
 
 def train_and_log_model():
-    """Training model + Log hasil ke MLflow"""
+    print("\n🚀 Training model dimulai...")
 
-    print("\n🚀 Mulai proses training model...")
-
-    # ===== 1. Load Data ===== #
+    # Load Dataset
     try:
         data = joblib.load(PREPROCESSED_DATA_PATH)
         X_train = data['X_train']
@@ -60,19 +63,16 @@ def train_and_log_model():
         y_train = data['y_train']
         y_test = data['y_test']
 
-        print("✅ Data preload berhasil!")
-
-        # Encoding label target
+        print("✅ Data loaded")
         le = LabelEncoder()
         y_train = le.fit_transform(y_train)
         y_test = le.transform(y_test)
 
     except Exception as e:
-        print(f"❌ ERROR: Tidak bisa load file data: {PREPROCESSED_DATA_PATH}")
-        print(f"Detail: {e}")
+        print(f"❌ ERROR load dataset: {e}")
         return
 
-    # ===== 2. Config Randomized Search Hyperparameters ===== #
+    # Hyperparameter Search
     param_dist = {
         'n_estimators': [100, 200, 300],
         'max_depth': [10, 20, None],
@@ -93,20 +93,17 @@ def train_and_log_model():
         n_jobs=-1
     )
 
-    # ===== 3. MLflow Logging ===== #
+    # Logging ke MLflow
     with mlflow.start_run() as run:
         run_id = run.info.run_id
         print(f"📌 MLflow Run ID: {run_id}")
 
-        # Training
         random_search.fit(X_train, y_train)
         best_model = random_search.best_estimator_
 
-        # Prediction
         y_pred = best_model.predict(X_test)
         y_proba = best_model.predict_proba(X_test)[:, 1]
 
-        # ===== Log Metrics ===== #
         metrics = {
             "accuracy": accuracy_score(y_test, y_pred),
             "precision": precision_score(y_test, y_pred, zero_division=0),
@@ -117,32 +114,27 @@ def train_and_log_model():
 
         mlflow.log_params(random_search.best_params_)
         mlflow.log_metrics(metrics)
-
-        print("\n📊 Metrik Berhasil Dilog:")
+        print("\n📊 Metrics Logged:")
         print(metrics)
 
-        # ===== Log Confusion Matrix ===== #
         cm = confusion_matrix(y_test, y_pred)
-        cm_path = plot_confusion_matrix(cm, run_id)
-        mlflow.log_artifact(cm_path, "evaluation_plots")
-        os.remove(cm_path)
-        print("✅ Confusion Matrix terlog ke MLflow")
+        cm_file = plot_confusion_matrix(cm, run_id)
+        mlflow.log_artifact(cm_file, "plots")
+        os.remove(cm_file)
 
-        # ===== Log Feature Importance ===== #
-        fi_path = f"feature_importance_{run_id}.csv"
-        feature_importance = pd.Series(best_model.feature_importances_)
-        feature_importance.to_csv(fi_path)
-        mlflow.log_artifact(fi_path, "model_metadata")
-        os.remove(fi_path)
-        print("✅ Feature importance terlog")
+        # ✅ Log Feature Importance
+        fi_file = f"feature_importance_{run_id}.csv"
+        pd.Series(best_model.feature_importances_).to_csv(fi_file)
+        mlflow.log_artifact(fi_file, "feature_importance")
+        os.remove(fi_file)
 
-        # ===== Log Model ===== #
-        model_path = "best_random_forest_model.pkl"
-        joblib.dump(best_model, model_path)
-        mlflow.log_artifact(model_path, "model_artifact")
-        os.remove(model_path)
+        # ✅ Log Model
+        model_file = "best_rf_model.pkl"
+        joblib.dump(best_model, model_file)
+        mlflow.log_artifact(model_file, "model")
+        os.remove(model_file)
 
-        print("\n✅ Model terbaik sukses dilog ke DagsHub/MLflow ✅")
+        print("\n✅ Model berhasil dicatat ke DagsHub ✅")
 
 
 if __name__ == "__main__":
