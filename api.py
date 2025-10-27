@@ -15,15 +15,17 @@ MODEL_ARTIFACT_PATH = "model"
 MODEL_FILE_NAME = "best_rf_model.pkl" 
 
 app = Flask(__name__)
-model = None
+model = None # Model diinisialisasi sebagai None global
 
 # --- Fungsi Pemuatan Model ---
 def load_model_from_mlflow():
     """Mengunduh model terbaik (Run terakhir) dari MLflow/DagsHub."""
     
+    # Ketika dijalankan oleh Gunicorn/Production, variabel ini harus ada
     if not MLFLOW_TRACKING_URI:
         print("❌ ERROR: MLFLOW_TRACKING_URI tidak disetel. Gagal memuat model.")
-        sys.exit(1)
+        # Mengembalikan None agar server bisa tetap hidup (meskipun error)
+        return None 
 
     print(f"✅ MLflow Tracking URI set to: {MLFLOW_TRACKING_URI}")
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
@@ -33,9 +35,9 @@ def load_model_from_mlflow():
         experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
         if not experiment:
              print(f"❌ ERROR: Experiment '{EXPERIMENT_NAME}' tidak ditemukan. Pastikan sudah di-run sebelumnya.")
-             sys.exit(1)
+             return None
              
-        # 2. Cari Run Terbaik/Terakhir (yang memiliki metrik terbaik, atau hanya yang terbaru)
+        # 2. Cari Run Terbaik/Terakhir
         runs = mlflow.search_runs(
             experiment_ids=[experiment.experiment_id],
             order_by=["attribute.start_time DESC"],
@@ -44,7 +46,7 @@ def load_model_from_mlflow():
         
         if runs.empty:
             print("❌ ERROR: Tidak ada run yang ditemukan dalam experiment.")
-            sys.exit(1)
+            return None
             
         latest_run_id = runs.iloc[0]['run_id']
         print(f"✅ Run ID Terbaik ditemukan: {latest_run_id}")
@@ -63,22 +65,16 @@ def load_model_from_mlflow():
 
     except Exception as e:
         print(f"❌ FATAL ERROR: Gagal memuat model dari MLflow/DagsHub. Detail: {e}")
-        sys.exit(1)
+        return None
 
-
-@app.before_first_request
-def initialize_model():
-    """Jalankan sekali saat server dimulai untuk memuat model."""
-    global model
-    model = load_model_from_mlflow()
-    if model:
-        print("Server API siap melayani permintaan!")
+# Kode inisialisasi dipindahkan ke blok __main__
 
 
 @app.route('/predict', methods=['POST'])
 def predict():
     """Endpoint untuk mendapatkan prediksi skor kredit."""
     if model is None:
+        # Jika model gagal dimuat saat startup, berikan error 500
         return jsonify({"error": "Model belum dimuat. Server gagal inisialisasi."}), 500
 
     try:
@@ -126,6 +122,13 @@ def health_check():
 
 
 if __name__ == '__main__':
+    # Global model diisi sebelum app.run() dipanggil.
+    model = load_model_from_mlflow()
+    if model:
+        print("Server API siap melayani permintaan!")
+
     # Server dijalankan pada port 5000, host 0.0.0.0 agar bisa diakses dari luar container
     print("Mencoba menjalankan server Flask...")
+    # Catatan: Ketika Gunicorn dijalankan (di Dockerfile), blok ini tidak dieksekusi,
+    # tetapi kode Gunicorn secara otomatis akan memuat model karena model diinisialisasi secara global (Top-Level Code).
     app.run(host='0.0.0.0', port=5000)
