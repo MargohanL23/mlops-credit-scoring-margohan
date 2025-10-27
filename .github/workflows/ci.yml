@@ -1,0 +1,31 @@
+name: CI/CD - MLOps Model Training
+
+on:
+  push:
+    branches:
+      - main 
+    paths:
+      - 'modelling_tuning.py' 
+
+jobs:
+  train_model_job:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and Run Docker Image
+        run: |
+          # Build image Docker menggunakan Dockerfile di root
+          docker build -t credit-scoring-model .
+
+          # Jalankan container dengan environment secrets untuk DagsHub/MLflow
+          docker run \
+            --env DAGSHUB_USERNAME=${{ secrets.DAGSHUB_USERNAME }} \
+            --env DAGSHUB_TOKEN=${{ secrets.DAGSHUB_TOKEN }} \
+            --env MLFLOW_TRACKING_URI=https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/mlops-credit-scoring-margohan.mlflow \
+            credit-scoring-model
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
