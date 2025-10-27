@@ -21,9 +21,6 @@ jobs:
           docker build -t credit-scoring-model .
 
           # Jalankan container dengan semua environment secrets yang diperlukan
-          # Menambahkan REPO_OWNER dan REPO_NAME sebagai ENV vars tambahan 
-          # untuk membantu MLflow Rest Store DagsHub menyelesaikan path, 
-          # yang seharusnya mengatasi error 404.
           docker run \
             --env DAGSHUB_USERNAME=${{ secrets.DAGSHUB_USERNAME }} \
             --env DAGSHUB_TOKEN=${{ secrets.DAGSHUB_TOKEN }} \
