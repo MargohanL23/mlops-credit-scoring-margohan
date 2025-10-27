@@ -2,7 +2,7 @@ import os
 import joblib
 import pandas as pd
 import numpy as np
-import dagshub
+# HAPUS import dagshub
 import mlflow
 import mlflow.sklearn
 import matplotlib.pyplot as plt
@@ -12,15 +12,7 @@ from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from sklearn.preprocessing import LabelEncoder 
 
-# --- KONFIGURASI DAGSHUB/MLFLOW ---
-
-REPO_OWNER = "MargohanL23" 
-REPO_NAME = "mlops-credit-scoring-margohan" 
-
-# Inisialisasi DagsHub dan Atur Tracking URI
-dagshub.init(repo_owner=REPO_OWNER, repo_name=REPO_NAME, mlflow=True)
-# Menggunakan mlflow.get_tracking_uri() untuk kompatibilitas versi
-mlflow.set_tracking_uri(mlflow.get_tracking_uri()) 
+# Nama Eksperimen
 mlflow.set_experiment("Credit Scoring Tuning - MARGOHAN")
 
 # Path ke artefak Kriteria 1
@@ -50,7 +42,7 @@ def train_and_log_model():
         y_train = data['y_train']
         y_test = data['y_test']
         
-        # --- PERBAIKAN: ENCODING LABEL TARGET ---
+        # --- ENCODING LABEL TARGET ---
         # Mengubah label string ('bad', 'good') menjadi numerik (0, 1)
         le = LabelEncoder()
         y_train = le.fit_transform(y_train)
