@@ -12,8 +12,8 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.preprocessing import LabelEncoder 
 
 # --- KONFIGURASI MLFLOW KRITIS UNTUK CI/CD ---
-# Pastikan MLflow client menggunakan URI yang disuntikkan dari environment variable
-# Ini mengatasi kegagalan 404 karena MLflow tidak menemukan endpoint.
+# Menggunakan environment variable yang disuntikkan oleh Docker/GitHub Actions.
+# Ini menggantikan dagshub.init() yang berpotensi menyebabkan konflik di CI.
 TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI")
 if TRACKING_URI:
     mlflow.set_tracking_uri(TRACKING_URI)
@@ -22,7 +22,7 @@ if TRACKING_URI:
 mlflow.set_experiment("Credit Scoring Tuning - MARGOHAN")
 
 # Path ke artefak Kriteria 1
-PREPROCESSED_DATA_PATH = 'namadataset_preprocessing/clean_data.pkl'
+PREPROCESSED_DATA_PATH = '//namadataset_preprocessing/clean_data.pkl'
 
 def plot_confusion_matrix(cm, run_id):
     """Membuat plot Confusion Matrix dan menyimpannya sebagai artefak."""
