@@ -11,22 +11,25 @@ from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from sklearn.preprocessing import LabelEncoder
 
-# ===== KONFIGURASI MLFLOW ===== #
+# ===== KONFIGURASI MLFLOW (Mengandalkan ENV Vars dari CI/CD) ===== #
 TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI")
 
 if TRACKING_URI:
     try:
+        # Menyetel URI dari environment variable yang disuntikkan Docker/CI
         mlflow.set_tracking_uri(TRACKING_URI)
         print(f"✅ MLflow Tracking URI set to: {TRACKING_URI}")
     except Exception as e:
+        # Jika gagal (misal: format URI salah), log error
         print(f"⚠️ Gagal set tracking URI: {e}")
         print("➡️ MLflow akan berjalan dalam offline mode (local).")
 else:
+    # Jika environment variable tidak ditemukan
     print("⚠️ MLFLOW_TRACKING_URI tidak ditemukan. MLflow offline mode.")
 
 mlflow.set_experiment("Credit Scoring Tuning - MARGOHAN")
 
-# Path dataset fix ✅ tanpa double slash
+# Path dataset fix 
 PREPROCESSED_DATA_PATH = 'namadataset_preprocessing/clean_data.pkl'
 
 
