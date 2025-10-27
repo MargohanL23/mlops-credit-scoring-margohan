@@ -2,7 +2,6 @@ import os
 import joblib
 import pandas as pd
 import numpy as np
-# HAPUS import dagshub
 import mlflow
 import mlflow.sklearn
 import matplotlib.pyplot as plt
@@ -12,7 +11,14 @@ from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from sklearn.preprocessing import LabelEncoder 
 
-# Nama Eksperimen
+# --- KONFIGURASI MLFLOW KRITIS UNTUK CI/CD ---
+# Pastikan MLflow client menggunakan URI yang disuntikkan dari environment variable
+# Ini mengatasi kegagalan 404 karena MLflow tidak menemukan endpoint.
+TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI")
+if TRACKING_URI:
+    mlflow.set_tracking_uri(TRACKING_URI)
+# ---------------------------------------------
+
 mlflow.set_experiment("Credit Scoring Tuning - MARGOHAN")
 
 # Path ke artefak Kriteria 1
