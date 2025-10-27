@@ -6,23 +6,29 @@ import mlflow
 import mlflow.sklearn
 import matplotlib.pyplot as plt
 import seaborn as sns 
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from sklearn.preprocessing import LabelEncoder 
 
-# --- KONFIGURASI MLFLOW KRITIS UNTUK CI/CD ---
-# Menggunakan environment variable yang disuntikkan oleh Docker/GitHub Actions.
-# Ini menggantikan dagshub.init() yang berpotensi menyebabkan konflik di CI.
+# --- KONFIGURASI MLFLOW ---
 TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI")
+
 if TRACKING_URI:
-    mlflow.set_tracking_uri(TRACKING_URI)
-# ---------------------------------------------
+    try:
+        mlflow.set_tracking_uri(TRACKING_URI)
+        print(f"MLflow Tracking URI set to {TRACKING_URI}")
+    except Exception as e:
+        print(f"⚠️ Gagal set tracking URI: {e}")
+        print("MLflow akan berjalan dalam offline mode.")
+else:
+    print("⚠️ MLFLOW_TRACKING_URI tidak ditemukan. MLflow offline mode.")
 
 mlflow.set_experiment("Credit Scoring Tuning - MARGOHAN")
 
-# Path ke artefak Kriteria 1
-PREPROCESSED_DATA_PATH = '/namadataset_preprocessing/clean_data.pkl'
+#  PATH dataset
+PREPROCESSED_DATA_PATH = 'namadataset_preprocessing/clean_data.pkl'
 
 def plot_confusion_matrix(cm, run_id):
     """Membuat plot Confusion Matrix dan menyimpannya sebagai artefak."""
