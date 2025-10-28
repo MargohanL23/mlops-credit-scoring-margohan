@@ -5,6 +5,7 @@ import joblib
 from flask import Flask, request, jsonify
 import mlflow
 import numpy as np
+from prometheus_flask_exporter import PrometheusMetrics # Import Prometheus Exporter
 
 # --- Konfigurasi MLflow (Diambil dari Environment Variables) ---
 MLFLOW_TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI")
@@ -17,6 +18,10 @@ MODEL_FILE_NAME = "best_rf_model.pkl"
 app = Flask(__name__)
 model = None # Model diinisialisasi sebagai None global
 
+# --- INISIALISASI PROMETHEUS METRICS ---
+# Exporter akan secara otomatis membuat endpoint /metrics
+metrics = PrometheusMetrics(app)
+
 # --- Fungsi Pemuatan Model ---
 def load_model_from_mlflow():
     """Mengunduh model terbaik (Run terakhir) dari MLflow/DagsHub."""
@@ -24,7 +29,6 @@ def load_model_from_mlflow():
     # Ketika dijalankan oleh Gunicorn/Production, variabel ini harus ada
     if not MLFLOW_TRACKING_URI:
         print("❌ ERROR: MLFLOW_TRACKING_URI tidak disetel. Gagal memuat model.")
-        # Mengembalikan None agar server bisa tetap hidup (meskipun error)
         return None 
 
     print(f"✅ MLflow Tracking URI set to: {MLFLOW_TRACKING_URI}")
@@ -67,14 +71,29 @@ def load_model_from_mlflow():
         print(f"❌ FATAL ERROR: Gagal memuat model dari MLflow/DagsHub. Detail: {e}")
         return None
 
-# Kode inisialisasi dipindahkan ke blok __main__
-
+# --- Custom Counter untuk Metrik Bisnis ---
+# Metrik ini harus dilacak dalam alur bisnis (di dalam fungsi predict)
+# Contoh metrik: Jumlah prediksi yang menghasilkan 'DEFAULT' (kelas 1)
+PREDICTIONS_COUNT = metrics.counter(
+    'predictions_total', 
+    'Total number of predictions made',
+    labels={'status': lambda: request.path} # Label untuk membedakan /predict
+)
+DEFAULT_COUNT = metrics.counter(
+    'default_predictions_total', 
+    'Total number of predictions that resulted in DEFAULT status',
+)
 
 @app.route('/predict', methods=['POST'])
+@metrics.counter('prediction_requests', 'Number of prediction requests') # Menghitung request ke /predict
+@metrics.histogram('request_latency_seconds', 'Request latency in seconds') # Menghitung latensi
 def predict():
     """Endpoint untuk mendapatkan prediksi skor kredit."""
+    
+    # Increment total requests counter (jika diperlukan)
+    PREDICTIONS_COUNT.inc()
+
     if model is None:
-        # Jika model gagal dimuat saat startup, berikan error 500
         return jsonify({"error": "Model belum dimuat. Server gagal inisialisasi."}), 500
 
     try:
@@ -94,14 +113,20 @@ def predict():
         prediction = model.predict(features)
         proba = model.predict_proba(features)
 
-        result = [
-            {
+        result = []
+        for pred, prob in zip(prediction, proba):
+            status = "DEFAULT" if pred == 1 else "NON_DEFAULT"
+            
+            # --- LOGIKA BISNIS MONITORING ---
+            if pred == 1:
+                DEFAULT_COUNT.inc() # Increment jika hasil prediksi adalah DEFAULT
+            # --- END LOGIKA BISNIS MONITORING ---
+
+            result.append({
                 "prediction_label": int(pred),
                 "probability_default": float(prob[1]), # Probabilitas kelas 1 (Default)
-                "status": "DEFAULT" if pred == 1 else "NON_DEFAULT"
-            }
-            for pred, prob in zip(prediction, proba)
-        ]
+                "status": status
+            })
 
         return jsonify({"predictions": result})
 
@@ -122,13 +147,11 @@ def health_check():
 
 
 if __name__ == '__main__':
-    # Global model diisi sebelum app.run() dipanggil.
+    # >>> Panggil fungsi inisialisasi di sini <<<
     model = load_model_from_mlflow()
     if model:
         print("Server API siap melayani permintaan!")
 
     # Server dijalankan pada port 5000, host 0.0.0.0 agar bisa diakses dari luar container
     print("Mencoba menjalankan server Flask...")
-    # Catatan: Ketika Gunicorn dijalankan (di Dockerfile), blok ini tidak dieksekusi,
-    # tetapi kode Gunicorn secara otomatis akan memuat model karena model diinisialisasi secara global (Top-Level Code).
     app.run(host='0.0.0.0', port=5000)
